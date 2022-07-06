@@ -1,0 +1,34 @@
+[tool.poetry]
+name = "matflow-cipher"
+version = "0.1.0"
+description = "MatFlow extension for the phase-field code CIPHER."
+authors = ["aplowman <adam.plowman@manchester.ac.uk>"]
+license = "MIT"
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = ">=3.8,<3.11"
+
+[tool.poetry.dev-dependencies]
+pylint = "^2.12.2"
+ipykernel = "^6.6.1"
+commitizen = "^2.20.3"
+pre-commit = "^2.16.0"
+black = "^22.3.0"
+
+[tool.commitizen]
+name = "cz_conventional_commits"
+version = "0.1.0"
+tag_format = "v$version"
+version_files = [ 
+    "pyproject.toml:version",
+    "matflow_cipher/_version.py"
+]
+bump_message = "bump: $current_version → $new_version [skip ci]"
+
+[tool.black]
+line-length = 90
+
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"
