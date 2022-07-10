@@ -11,6 +11,7 @@ from matflow.extensions import (
     register_output_file,
     func_mapper,
     software_versions,
+    sources_mapper,
 )
 
 SOFTWARE = 'cipher'
@@ -21,6 +22,7 @@ cli_format_mapper = partial(cli_format_mapper, software=SOFTWARE)
 register_output_file = partial(register_output_file, software=SOFTWARE)
 func_mapper = partial(func_mapper, software=SOFTWARE)
 software_versions = partial(software_versions, software=SOFTWARE)
+sources_mapper = partial(sources_mapper, software=SOFTWARE)
 
 # Import any modules that contain functions decorated by the matflow function decorators.
 # This import must come after the above `partial`s.
