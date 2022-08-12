@@ -52,6 +52,7 @@ def write_generate_phase_field_input_VE_input(
     outputs,
     solution_parameters,
     random_seed,
+    interface_energy_misorientation_expansion,
 ):
     kwargs = {
         'volume_element': volume_element,
@@ -63,6 +64,7 @@ def write_generate_phase_field_input_VE_input(
         'outputs': outputs,
         'solution_parameters': solution_parameters,
         'random_seed': random_seed,
+        'interface_energy_misorientation_expansion': interface_energy_misorientation_expansion,
     }
     hickle.dump(kwargs, path)
 

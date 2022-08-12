@@ -7,6 +7,7 @@ from cipher_parse.cipher_input import (
     InterfaceDefinition,
     PhaseTypeDefinition,
 )
+from cipher_parse.utilities import read_shockley
 
 @main_func
 def generate_phase_field_input_from_volume_element(
@@ -19,6 +20,7 @@ def generate_phase_field_input_from_volume_element(
     outputs,
     solution_parameters,
     random_seed,
+    interface_energy_misorientation_expansion,
 ):
     mats = []
     for mat_i in materials:
@@ -46,7 +48,31 @@ def generate_phase_field_input_from_volume_element(
         outputs=outputs,
         solution_parameters=solution_parameters,
     )
-    phase_field_input = inp.to_JSON()
+    if interface_energy_misorientation_expansion:
+        # Calculate misorientations between all phases, and use Read-Shockley to assign
+        # a GB energy for each phase pair; optionally bin phase-pairs togetherL
+        
+        RS_params = interface_energy_misorientation_expansion['read_shockley']
+
+        misori = inp.geometry.get_misorientation_matrix()
+        E_GB = read_shockley(misori, **RS_params)
+
+        num_bins = interface_energy_misorientation_expansion.get('num_bins')
+        if num_bins:
+            bin_edges = np.linspace(0, RS_params['E_max'], num=num_bins)
+        else:
+            bin_edges = None
+            
+        for int_name in interface_energy_misorientation_expansion['interfaces']:
+            inp.apply_interface_property(
+                base_interface_name=int_name,
+                property_name=('energy', 'e0'),
+                property_values=E_GB,
+                additional_metadata={'misorientation': misori},
+                bin_edges=bin_edges,
+            )
+
+    phase_field_input = inp.to_JSON(keep_arrays=True)
     
     return phase_field_input
 
