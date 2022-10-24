@@ -40,6 +40,6 @@ def generate_phase_field_input_from_random_voronoi(
         solution_parameters=solution_parameters,
         random_seed=random_seed,
     )
-    phase_field_input = inp.to_JSON()
+    phase_field_input = inp.to_JSON(keep_arrays=True)
 
     return phase_field_input
