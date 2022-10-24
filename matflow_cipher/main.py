@@ -92,7 +92,7 @@ def generate_phase_field_input_from_random_voronoi():
     method='from_volume_element',
     script='generate_phase_field_input_from_volume_element',
 )
-def generate_phase_field_input_from_random_voronoi():
+def generate_phase_field_input_from_volume_element():
 
     script_name = 'generate_phase_field_input_from_volume_element.py'
     snippets = [{'name': 'generate_phase_field_input_from_volume_element.py'}]
@@ -103,7 +103,7 @@ def generate_phase_field_input_from_random_voronoi():
             'filename': script_name,
         }
     }
-    return out    
+    return out
 
 @output_mapper(
     output_name='phase_field_input',
