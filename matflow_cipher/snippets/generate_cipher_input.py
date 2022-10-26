@@ -7,11 +7,7 @@ from textwrap import dedent
 def generate_cipher_input(phase_field_input):
     inp = CIPHERInput.from_JSON(phase_field_input)
     inp.write_yaml('cipher_input.yaml')
-    
     output_lookup = {i: f"out output.{idx}" for idx, i in enumerate(inp.outputs)}
-    print(output_lookup, flush=True)
-
-    print(f"inp.geometry.grid_size: {inp.geometry.grid_size}")
 
     # MEGA HACK: also write out a Paraview batch script for converting VTU to VTI files:
     # The original VTU fils are more useful for visualisation, and the VTI files are useful
