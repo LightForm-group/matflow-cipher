@@ -110,16 +110,10 @@ def generate_cipher_input(phase_field_input):
                 dst_i = viz_dir.joinpath(viz_file_i.name).with_suffix('.viz' + viz_file_i.suffix)
                 shutil.move(viz_file_i, dst_i)
 
-            viz_files_idx = get_evenly_spaced_subset(vtu_file_list, max_viz_files)        
-            print(f'viz_files_idx: {{viz_files_idx}}')
-
-            print(f'vtu_orig_file_list: {{vtu_orig_file_list}}')
-
+            viz_files_idx = get_evenly_spaced_subset(vtu_file_list, max_viz_files)
             for i in viz_files_idx:
                 viz_file_i = vtu_orig_file_list[i]
                 dst_i = Path('').joinpath(viz_file_i.name).with_suffix('').with_suffix('.vtu')
-                print(f"viz_file_i: {{viz_file_i}}")
-                print(f"dst_i: {{dst_i}}")
                 shutil.copy(viz_file_i, dst_i)
                 
 
