@@ -1,5 +1,6 @@
 "`matflow_cipher.main.py`"
 
+import json
 from pathlib import Path
 from textwrap import dedent
 
@@ -295,6 +296,47 @@ def write_generate_phase_field_input_from_volume_element_py(path):
 )
 def read_phase_field_input(path):
     return hickle.load(path)
+
+@input_mapper(
+    input_file="cipher_output_parse_args.json",
+    task="simulate_grain_growth",
+    method="phase_field",
+)
+def write_cipher_output_parse_args_json(path, max_viz_files):
+    with Path(path).open("wt") as fp:
+        args = {
+            'max_viz_files': max_viz_files,
+        }
+        json.dump(args, fp)
+
+@input_mapper(
+    input_file="cipher_output_parse.py",
+    task="simulate_grain_growth",
+    method="phase_field",
+)
+def write_cipher_output_parse_py(path):
+    with Path(path).open("wt") as fp:
+        fp.write(
+            dedent(
+                """
+                import hickle
+                import json
+                from pathlib import Path
+
+                from cipher_parse.cipher_output import CIPHEROutput
+
+                if __name__ == "__main__":
+
+                    with Path('cipher_output_parse_args.json').open('rt') as fp:
+                        args = json.load(fp)
+
+                    out = CIPHEROutput.parse(directory='.', **args)
+                    out_js = out.to_JSON(keep_arrays=True)
+                    hickle.dump(out_js, 'post_proc_outputs.hdf5')
+
+            """
+            )
+        )
 
 @input_mapper(input_file='inputs.hdf5', task='simulate_grain_growth', method='phase_field')
 def write_simulate_grain_growth_phase_field_input(path, phase_field_input):
