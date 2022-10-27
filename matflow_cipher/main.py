@@ -1,8 +1,9 @@
 "`matflow_cipher.main.py`"
 
-from matflow.scripting import get_wrapper_script
+from pathlib import Path
+from textwrap import dedent
 
-from matflow_cipher import input_mapper, output_mapper, sources_mapper
+from matflow_cipher import input_mapper, output_mapper
 
 import hickle
 
@@ -22,6 +23,7 @@ def write_generate_phase_field_input_RV_input(
     outputs,
     solution_parameters,
     random_seed,
+    is_periodic,
 ):
     kwargs = {
         'materials': materials,
@@ -33,8 +35,77 @@ def write_generate_phase_field_input_RV_input(
         'outputs': outputs,
         'solution_parameters': solution_parameters,
         'random_seed': random_seed,
+        'is_periodic': is_periodic,
     }
     hickle.dump(kwargs, path)
+
+
+@input_mapper(
+    input_file="generate_phase_field_input_from_random_voronoi.py",
+    task="generate_phase_field_input",
+    method="from_random_voronoi",
+)
+def write_generate_phase_field_input_from_random_voronoi_py(path):
+    with Path(path).open("wt") as fp:
+        fp.write(
+            dedent(
+                """
+            from cipher_parse.cipher_input import (
+                CIPHERInput,
+                MaterialDefinition,
+                InterfaceDefinition,
+                PhaseTypeDefinition,
+            )
+            import sys
+            import hickle
+            from pathlib import Path
+
+            def generate_phase_field_input_from_random_voronoi(
+                materials,
+                interfaces,
+                num_phases,
+                grid_size,
+                size,
+                components,
+                outputs,
+                solution_parameters,
+                random_seed,
+                is_periodic,
+            ):
+                mats = []
+                for mat_i in materials:
+                    if "phase_types" in mat_i:
+                        mat_i["phase_types"] = [
+                            PhaseTypeDefinition(**j) for j in mat_i["phase_types"]
+                        ]
+                    mat_i = MaterialDefinition(**mat_i)
+                    mats.append(mat_i)
+
+                interfaces = [InterfaceDefinition(**int_i) for int_i in interfaces]
+
+                inp = CIPHERInput.from_random_voronoi(
+                    materials=mats,
+                    interfaces=interfaces,
+                    num_phases=num_phases,
+                    grid_size=grid_size,
+                    size=size,
+                    components=components,
+                    outputs=outputs,
+                    solution_parameters=solution_parameters,
+                    random_seed=random_seed,
+                    is_periodic=is_periodic,
+                )
+                phase_field_input = inp.to_JSON(keep_arrays=True)
+
+                return phase_field_input
+
+            if __name__ == "__main__":
+                inputs = hickle.load(sys.argv[1])
+                outputs = generate_phase_field_input_from_random_voronoi(**inputs)
+                hickle.dump(outputs, "outputs.hdf5")
+            """
+            )
+        )
 
 @input_mapper(
     input_file='inputs.hdf5',
@@ -68,42 +139,144 @@ def write_generate_phase_field_input_VE_input(
     }
     hickle.dump(kwargs, path)
 
-
-@sources_mapper(
-    task='generate_phase_field_input',
-    method='from_random_voronoi',
-    script='generate_phase_field_input_from_random_voronoi',
+@input_mapper(
+    input_file="generate_phase_field_input_from_volume_element.py",
+    task="generate_phase_field_input",
+    method="from_volume_element",
 )
-def generate_phase_field_input_from_random_voronoi():
+def write_generate_phase_field_input_from_volume_element_py(path):
+    with Path(path).open("wt") as fp:
+        fp.write(
+            dedent(
+                """
+            import numpy as np
+            from cipher_parse.cipher_input import (
+                CIPHERInput,
+                CIPHERGeometry,
+                MaterialDefinition,
+                InterfaceDefinition,
+                PhaseTypeDefinition,
+            )
+            from cipher_parse.utilities import read_shockley
 
-    script_name = 'generate_phase_field_input_from_random_voronoi.py'
-    snippets = [{'name': 'generate_phase_field_input_from_random_voronoi.py'}]
-    outputs = ['phase_field_input']
-    out = {
-        'script': {
-            'content': get_wrapper_script(__package__, script_name, snippets, outputs),
-            'filename': script_name,
-        }
-    }
-    return out
+            def generate_phase_field_input_from_volume_element(
+                volume_element,
+                materials,
+                interfaces,
+                phase_type_map,
+                size,
+                components,
+                outputs,
+                solution_parameters,
+                random_seed,
+                interface_energy_misorientation_expansion,
+            ):
+                mats = []
+                for mat_i in materials:
+                    if "phase_types" in mat_i:
+                        mat_i["phase_types"] = [
+                            PhaseTypeDefinition(**j) for j in mat_i["phase_types"]
+                        ]
+                    mat_i = MaterialDefinition(**mat_i)
+                    mats.append(mat_i)
 
-@sources_mapper(
-    task='generate_phase_field_input',
-    method='from_volume_element',
-    script='generate_phase_field_input_from_volume_element',
-)
-def generate_phase_field_input_from_volume_element():
+                interfaces = [InterfaceDefinition(**int_i) for int_i in interfaces]
 
-    script_name = 'generate_phase_field_input_from_volume_element.py'
-    snippets = [{'name': 'generate_phase_field_input_from_volume_element.py'}]
-    outputs = ['phase_field_input']
-    out = {
-        'script': {
-            'content': get_wrapper_script(__package__, script_name, snippets, outputs),
-            'filename': script_name,
-        }
-    }
-    return out
+                geom = volume_element_to_cipher_geometry(
+                    volume_element=volume_element, 
+                    cipher_materials=mats,
+                    cipher_interfaces=interfaces,
+                    phase_type_map=phase_type_map,
+                    size=size,
+                    random_seed=random_seed,
+                )
+
+                inp = CIPHERInput(
+                    geometry=geom,
+                    components=components,
+                    outputs=outputs,
+                    solution_parameters=solution_parameters,
+                )
+                if interface_energy_misorientation_expansion:
+                    # Calculate misorientations between all phases, and use Read-Shockley to assign
+                    # a GB energy for each phase pair; optionally bin phase-pairs togetherL
+                    
+                    RS_params = interface_energy_misorientation_expansion['read_shockley']
+
+                    misori = inp.geometry.get_misorientation_matrix()
+                    E_GB = read_shockley(misori, **RS_params)
+
+                    num_bins = interface_energy_misorientation_expansion.get('num_bins')
+                    if num_bins:
+                        bin_edges = np.linspace(0, RS_params['E_max'], num=num_bins)
+                    else:
+                        bin_edges = None
+                        
+                    for int_name in interface_energy_misorientation_expansion['interfaces']:
+                        inp.apply_interface_property(
+                            base_interface_name=int_name,
+                            property_name=('energy', 'e0'),
+                            property_values=E_GB,
+                            additional_metadata={'misorientation': misori},
+                            bin_edges=bin_edges,
+                        )
+
+                phase_field_input = inp.to_JSON(keep_arrays=True)
+                
+                return phase_field_input
+
+            def volume_element_to_cipher_geometry(
+                volume_element,
+                cipher_materials,
+                cipher_interfaces,
+                phase_type_map=None,
+                size=None,
+                random_seed=None
+            ):
+
+                uq, inv = np.unique(volume_element['constituent_phase_label'], return_inverse=True)
+                cipher_phases = {i: np.where(inv == idx)[0] for idx, i in enumerate(uq)}
+                orientations = volume_element['orientations']['quaternions']
+                for mat_name_i in cipher_phases:
+                    phases_set = False
+                    if phase_type_map:
+                        phase_type_name = phase_type_map[mat_name_i]
+                    else:
+                        phase_type_name = mat_name_i
+                    for mat in cipher_materials:
+                        for phase_type_i in mat.phase_types:
+                            if phase_type_i.name == phase_type_name:
+                                phase_i_idx = cipher_phases[mat_name_i]
+                                phase_type_i.phases = phase_i_idx
+                                phase_type_i.orientations = orientations[phase_i_idx]
+                                phases_set = True
+                                break
+                        if phases_set:
+                            break
+
+                    if not phases_set:
+                        raise ValueError(
+                            f"No defined material/phase-type for Dream3D phase {mat_name_i!r}"
+                        )
+
+                geom = CIPHERGeometry(
+                    voxel_phase=volume_element['element_material_idx'],
+                    size=volume_element['size'] if size is None else size,
+                    materials=cipher_materials,
+                    interfaces=cipher_interfaces,
+                    random_seed=random_seed,
+                )
+                return geom
+            
+            if __name__ == "__main__":
+                inputs = hickle.load(sys.argv[1])
+                outputs = generate_phase_field_input_from_volume_element(**inputs)
+                hickle.dump(outputs, "outputs.hdf5")
+
+            """
+            )
+        )
+
 
 @output_mapper(
     output_name='phase_field_input',
@@ -128,21 +301,3 @@ def write_simulate_grain_growth_phase_field_input(path, phase_field_input):
     kwargs = {'phase_field_input': phase_field_input}
     hickle.dump(kwargs, path)
 
-
-@sources_mapper(
-    task='simulate_grain_growth',
-    method='phase_field',
-    script='generate_cipher_input',
-)
-def generate_cipher_input():
-
-    script_name = 'generate_cipher_input.py'
-    snippets = [{'name': 'generate_cipher_input.py'}]
-    outputs = []
-    out = {
-        'script': {
-            'content': get_wrapper_script(__package__, script_name, snippets, outputs),
-            'filename': script_name,
-        }
-    }
-    return out
