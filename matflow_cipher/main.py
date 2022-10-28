@@ -150,7 +150,11 @@ def write_generate_phase_field_input_from_volume_element_py(path):
         fp.write(
             dedent(
                 """
+            import sys
+            
             import numpy as np
+            import hickle
+
             from cipher_parse.cipher_input import (
                 CIPHERInput,
                 CIPHERGeometry,
