@@ -40,6 +40,41 @@ def write_generate_phase_field_input_RV_input(
     }
     hickle.dump(kwargs, path)
 
+@input_mapper(
+    input_file='inputs.hdf5',
+    task='generate_phase_field_input',
+    method='from_random_voronoi_with_orientations',
+)
+def write_generate_phase_field_input_RV_with_orientations_input(
+    path,
+    materials,
+    interfaces,
+    num_phases,
+    grid_size,
+    size,
+    components,
+    outputs,
+    solution_parameters,
+    orientations,
+    random_seed,
+    is_periodic,
+):
+    kwargs = {
+        'materials': materials,
+        'interfaces': interfaces,
+        'num_phases': num_phases,
+        'grid_size': grid_size,
+        'size': size,
+        'components': components,
+        'outputs': outputs,
+        'solution_parameters': solution_parameters,
+        'orientations': orientations,
+        'random_seed': random_seed,
+        'is_periodic': is_periodic,
+    }
+    hickle.dump(kwargs, path)
+
+
 
 @input_mapper(
     input_file="generate_phase_field_input_from_random_voronoi.py",
@@ -73,12 +108,93 @@ def write_generate_phase_field_input_from_random_voronoi_py(path):
                 random_seed,
                 is_periodic,
             ):
+                # initialise `MaterialDefinition`, `InterfaceDefinition` and 
+                # `PhaseTypeDefinition` objects:
                 mats = []
                 for mat_i in materials:
                     if "phase_types" in mat_i:
                         mat_i["phase_types"] = [
                             PhaseTypeDefinition(**j) for j in mat_i["phase_types"]
                         ]
+                    mat_i = MaterialDefinition(**mat_i)
+                    mats.append(mat_i)
+
+                interfaces = [InterfaceDefinition(**int_i) for int_i in interfaces]
+
+                inp = CIPHERInput.from_random_voronoi(
+                    materials=mats,
+                    interfaces=interfaces,
+                    num_phases=num_phases,
+                    grid_size=grid_size,
+                    size=size,
+                    components=components,
+                    outputs=outputs,
+                    solution_parameters=solution_parameters,
+                    random_seed=random_seed,
+                    is_periodic=is_periodic,
+                )
+                phase_field_input = inp.to_JSON(keep_arrays=True)
+
+                return phase_field_input
+
+            if __name__ == "__main__":
+                inputs = hickle.load(sys.argv[1])
+                outputs = generate_phase_field_input_from_random_voronoi(**inputs)
+                hickle.dump(outputs, "outputs.hdf5")
+            """
+            )
+        )
+
+@input_mapper(
+    input_file="generate_phase_field_input_from_random_voronoi_orientations.py",
+    task="generate_phase_field_input",
+    method="from_random_voronoi_with_orientations",
+)
+def write_generate_phase_field_input_from_random_voronoi_orientations_py(path):
+    with Path(path).open("wt") as fp:
+        fp.write(
+            dedent(
+                """
+            from cipher_parse.cipher_input import (
+                CIPHERInput,
+                MaterialDefinition,
+                InterfaceDefinition,
+                PhaseTypeDefinition,
+            )
+            import sys
+            import hickle
+            from pathlib import Path
+
+            def generate_phase_field_input_from_random_voronoi(
+                materials,
+                interfaces,
+                num_phases,
+                grid_size,
+                size,
+                components,
+                outputs,
+                solution_parameters,
+                random_seed,
+                is_periodic,
+                orientations,
+            ):
+                quats = orientations['quaternions']
+
+                # initialise `MaterialDefinition`, `InterfaceDefinition` and 
+                # `PhaseTypeDefinition` objects:
+                mats = []
+                for mat_idx, mat_i in enumerate(materials):
+                    if "phase_types" in mat_i:
+                        mat_i["phase_types"] = [
+                            PhaseTypeDefinition(**j) for j in mat_i["phase_types"]
+                        ]
+                    else:
+                        mat_i["phase_types"] = [PhaseTypeDefinition()]
+                    
+                    if mat_idx == 0:
+                        # add oris to the first defined phase type of the first material:
+                        mat_i["phase_types"][0].orientations = quats
+
                     mat_i = MaterialDefinition(**mat_i)
                     mats.append(mat_i)
 
@@ -291,6 +407,11 @@ def write_generate_phase_field_input_from_volume_element_py(path):
 @output_mapper(
     output_name='phase_field_input',
     task='generate_phase_field_input',
+    method='from_random_voronoi_with_orientations',
+)
+@output_mapper(
+    output_name='phase_field_input',
+    task='generate_phase_field_input',
     method='from_volume_element',
 )
 @output_mapper(
@@ -306,10 +427,14 @@ def read_phase_field_input(path):
     task="simulate_grain_growth",
     method="phase_field",
 )
-def write_cipher_output_parse_args_json(path, max_viz_files):
+def write_cipher_output_parse_args_json(path, num_VTU_files, derive_outputs, save_outputs, delete_VTIs, delete_VTUs):
     with Path(path).open("wt") as fp:
         args = {
-            'max_viz_files': max_viz_files,
+            'num_VTU_files': num_VTU_files,
+            'derive_outputs': derive_outputs,
+            'save_outputs': save_outputs,
+            'delete_VTIs': delete_VTIs,
+            'delete_VTUs': delete_VTUs,
         }
         json.dump(args, fp)
 
@@ -334,7 +459,7 @@ def write_cipher_output_parse_py(path):
                     with Path('cipher_output_parse_args.json').open('rt') as fp:
                         args = json.load(fp)
 
-                    out = CIPHEROutput.parse(directory='.', **args)
+                    out = CIPHEROutput.parse(directory='.', options=args)
                     out_js = out.to_JSON(keep_arrays=True)
                     hickle.dump(out_js, 'post_proc_outputs.hdf5')
 
