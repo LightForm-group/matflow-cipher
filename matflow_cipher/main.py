@@ -58,6 +58,7 @@ def write_generate_phase_field_input_RV_with_orientations_input(
     orientations,
     random_seed,
     is_periodic,
+    interface_energy_misorientation_expansion,
 ):
     kwargs = {
         'materials': materials,
@@ -71,6 +72,7 @@ def write_generate_phase_field_input_RV_with_orientations_input(
         'orientations': orientations,
         'random_seed': random_seed,
         'is_periodic': is_periodic,
+        'interface_energy_misorientation_expansion': interface_energy_misorientation_expansion,
     }
     hickle.dump(kwargs, path)
 
@@ -155,15 +157,19 @@ def write_generate_phase_field_input_from_random_voronoi_orientations_py(path):
         fp.write(
             dedent(
                 """
+            import sys
+            from pathlib import Path
+            
+            import hickle
+            import numpy as np
+
             from cipher_parse.cipher_input import (
                 CIPHERInput,
                 MaterialDefinition,
                 InterfaceDefinition,
                 PhaseTypeDefinition,
             )
-            import sys
-            import hickle
-            from pathlib import Path
+            from cipher_parse.utilities import read_shockley
 
             def generate_phase_field_input_from_random_voronoi(
                 materials,
@@ -177,6 +183,7 @@ def write_generate_phase_field_input_from_random_voronoi_orientations_py(path):
                 random_seed,
                 is_periodic,
                 orientations,
+                interface_energy_misorientation_expansion,
             ):
                 quats = orientations['quaternions']
 
@@ -212,6 +219,31 @@ def write_generate_phase_field_input_from_random_voronoi_orientations_py(path):
                     random_seed=random_seed,
                     is_periodic=is_periodic,
                 )
+
+                if interface_energy_misorientation_expansion:
+                    # Calculate misorientations between all phases, and use Read-Shockley to assign
+                    # a GB energy for each phase pair; optionally bin phase-pairs together:
+                    
+                    RS_params = interface_energy_misorientation_expansion['read_shockley']
+
+                    misori = inp.geometry.get_misorientation_matrix()
+                    E_GB = read_shockley(misori, **RS_params)
+
+                    num_bins = interface_energy_misorientation_expansion.get('num_bins')
+                    if num_bins:
+                        bin_edges = np.linspace(0, RS_params['E_max'], num=num_bins)
+                    else:
+                        bin_edges = None
+                        
+                    for int_name in interface_energy_misorientation_expansion['interfaces']:
+                        inp.apply_interface_property(
+                            base_interface_name=int_name,
+                            property_name=('energy', 'e0'),
+                            property_values=E_GB,
+                            additional_metadata={'misorientation': misori},
+                            bin_edges=bin_edges,
+                        )
+
                 phase_field_input = inp.to_JSON(keep_arrays=True)
 
                 return phase_field_input
