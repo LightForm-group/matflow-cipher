@@ -459,10 +459,13 @@ def read_phase_field_input(path):
     task="simulate_grain_growth",
     method="phase_field",
 )
-def write_cipher_output_parse_args_json(path, num_VTU_files, derive_outputs, save_outputs, delete_VTIs, delete_VTUs):
+def write_cipher_output_parse_args_json(path, num_VTU_files, VTU_files_time_interval, derive_outputs, save_outputs, delete_VTIs, delete_VTUs):
+    if num_VTU_files is not None and VTU_files_time_interval is not None:
+        num_VTU_files = None
     with Path(path).open("wt") as fp:
         args = {
             'num_VTU_files': num_VTU_files,
+            'VTU_files_time_interval': VTU_files_time_interval,
             'derive_outputs': derive_outputs,
             'save_outputs': save_outputs,
             'delete_VTIs': delete_VTIs,
@@ -475,7 +478,7 @@ def write_cipher_output_parse_args_json(path, num_VTU_files, derive_outputs, sav
     task="simulate_grain_growth",
     method="phase_field",
 )
-def write_cipher_output_parse_py(path):
+def write_cipher_input_py(path):
     with Path(path).open("wt") as fp:
         fp.write(
             dedent(
