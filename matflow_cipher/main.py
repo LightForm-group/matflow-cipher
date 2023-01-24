@@ -88,7 +88,7 @@ def write_generate_phase_field_input_from_random_voronoi_py(path):
         fp.write(
             dedent(
                 """
-            from cipher_parse.cipher_input import (
+            from cipher_parse import (
                 CIPHERInput,
                 MaterialDefinition,
                 InterfaceDefinition,
@@ -163,7 +163,7 @@ def write_generate_phase_field_input_from_random_voronoi_orientations_py(path):
             import hickle
             import numpy as np
 
-            from cipher_parse.cipher_input import (
+            from cipher_parse import (
                 CIPHERInput,
                 MaterialDefinition,
                 InterfaceDefinition,
@@ -303,7 +303,7 @@ def write_generate_phase_field_input_from_volume_element_py(path):
             import numpy as np
             import hickle
 
-            from cipher_parse.cipher_input import (
+            from cipher_parse import (
                 CIPHERInput,
                 CIPHERGeometry,
                 MaterialDefinition,
@@ -484,7 +484,7 @@ def write_cipher_input_py(path):
             dedent(
                 """
                 import hickle
-                from cipher_parse.cipher_input import CIPHERInput
+                from cipher_parse import CIPHERInput
 
                 if __name__ == "__main__":
                     inp = CIPHERInput.from_JSON(hickle.load('inputs.hdf5')['phase_field_input'])
@@ -509,7 +509,7 @@ def write_cipher_output_parse_py(path):
                 import json
                 from pathlib import Path
 
-                from cipher_parse.cipher_output import CIPHEROutput
+                from cipher_parse import CIPHEROutput
 
                 if __name__ == "__main__":
 
