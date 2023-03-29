@@ -273,6 +273,7 @@ def write_generate_phase_field_input_VE_input(
     solution_parameters,
     random_seed,
     interface_energy_misorientation_expansion,
+    keep_3D,
 ):
     kwargs = {
         'volume_element': volume_element,
@@ -285,6 +286,7 @@ def write_generate_phase_field_input_VE_input(
         'solution_parameters': solution_parameters,
         'random_seed': random_seed,
         'interface_energy_misorientation_expansion': interface_energy_misorientation_expansion,
+        'keep_3D': keep_3D,
     }
     hickle.dump(kwargs, path)
 
@@ -323,6 +325,7 @@ def write_generate_phase_field_input_from_volume_element_py(path):
                 solution_parameters,
                 random_seed,
                 interface_energy_misorientation_expansion,
+                keep_3D,
             ):
                 mats = []
                 for mat_i in materials:
@@ -342,6 +345,7 @@ def write_generate_phase_field_input_from_volume_element_py(path):
                     phase_type_map=phase_type_map,
                     size=size,
                     random_seed=random_seed,
+                    keep_3D=keep_3D,
                 )
 
                 inp = CIPHERInput(
@@ -384,7 +388,8 @@ def write_generate_phase_field_input_from_volume_element_py(path):
                 cipher_interfaces,
                 phase_type_map=None,
                 size=None,
-                random_seed=None
+                random_seed=None,
+                keep_3D=False,
             ):
 
                 uq, inv = np.unique(volume_element['constituent_phase_label'], return_inverse=True)
@@ -412,9 +417,15 @@ def write_generate_phase_field_input_from_volume_element_py(path):
                             f"No defined material/phase-type for Dream3D phase {mat_name_i!r}"
                         )
 
+                voxel_phase = volume_element['element_material_idx']
+                size = volume_element['size'] if size is None else size
+                if voxel_phase.ndim == 3 and voxel_phase.shape[2] == 1 and not keep_3D:
+                    voxel_phase = voxel_phase[..., 0]
+                    size = size[:2]
+
                 geom = CIPHERGeometry(
-                    voxel_phase=volume_element['element_material_idx'],
-                    size=volume_element['size'] if size is None else size,
+                    voxel_phase=voxel_phase,
+                    size=size,
                     materials=cipher_materials,
                     interfaces=cipher_interfaces,
                     random_seed=random_seed,
