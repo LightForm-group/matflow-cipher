@@ -58,7 +58,7 @@ def write_generate_phase_field_input_RV_with_orientations_input(
     orientations,
     random_seed,
     is_periodic,
-    interface_energy_misorientation_expansion,
+    interface_binning,
 ):
     kwargs = {
         'materials': materials,
@@ -72,11 +72,45 @@ def write_generate_phase_field_input_RV_with_orientations_input(
         'orientations': orientations,
         'random_seed': random_seed,
         'is_periodic': is_periodic,
-        'interface_energy_misorientation_expansion': interface_energy_misorientation_expansion,
+        'interface_binning': interface_binning,
     }
     hickle.dump(kwargs, path)
 
-
+@input_mapper(
+    input_file='inputs.hdf5',
+    task='generate_phase_field_input',
+    method='from_random_voronoi_with_orientation_gradient',
+)
+def write_generate_phase_field_input_RV_with_orientations_gradient_input(
+    path,
+    materials,
+    interfaces,
+    num_phases,
+    grid_size,
+    size,
+    components,
+    outputs,
+    solution_parameters,
+    orientation_gradient,
+    random_seed,
+    is_periodic,
+    interface_binning,
+):
+    kwargs = {
+        'materials': materials,
+        'interfaces': interfaces,
+        'num_phases': num_phases,
+        'grid_size': grid_size,
+        'size': size,
+        'components': components,
+        'outputs': outputs,
+        'solution_parameters': solution_parameters,
+        'orientation_gradient': orientation_gradient,
+        'random_seed': random_seed,
+        'is_periodic': is_periodic,
+        'interface_binning': interface_binning,
+    }
+    hickle.dump(kwargs, path)
 
 @input_mapper(
     input_file="generate_phase_field_input_from_random_voronoi.py",
@@ -183,7 +217,7 @@ def write_generate_phase_field_input_from_random_voronoi_orientations_py(path):
                 random_seed,
                 is_periodic,
                 orientations,
-                interface_energy_misorientation_expansion,
+                interface_binning,
             ):
                 quats = orientations['quaternions']
 
@@ -220,29 +254,124 @@ def write_generate_phase_field_input_from_random_voronoi_orientations_py(path):
                     is_periodic=is_periodic,
                 )
 
-                if interface_energy_misorientation_expansion:
-                    # Calculate misorientations between all phases, and use Read-Shockley to assign
-                    # a GB energy for each phase pair; optionally bin phase-pairs together:
+                if interface_binning:
+                    inp.bin_interfaces_by_misorientation_angle(**interface_binning)
+
+                phase_field_input = inp.to_JSON(keep_arrays=True)
+
+                return phase_field_input
+
+            if __name__ == "__main__":
+                inputs = hickle.load(sys.argv[1])
+                outputs = generate_phase_field_input_from_random_voronoi(**inputs)
+                hickle.dump(outputs, "outputs.hdf5")
+            """
+            )
+        )
+
+@input_mapper(
+    input_file="generate_phase_field_input_from_random_voronoi_orientations.py",
+    task="generate_phase_field_input",
+    method="from_random_voronoi_with_orientation_gradient",
+)
+def write_generate_phase_field_input_from_random_voronoi_orientations_gradient_py(path):
+    with Path(path).open("wt") as fp:
+        fp.write(
+            dedent(
+                """
+            import sys
+            from pathlib import Path
+            
+            import hickle
+            import numpy as np
+
+            from cipher_parse import (
+                CIPHERInput,
+                MaterialDefinition,
+                InterfaceDefinition,
+                PhaseTypeDefinition,
+            )
+            from cipher_parse.utilities import read_shockley, sample_from_orientations_gradient
+
+            def generate_phase_field_input_from_random_voronoi(
+                materials,
+                interfaces,
+                num_phases,
+                grid_size,
+                size,
+                components,
+                outputs,
+                solution_parameters,
+                orientation_gradient,
+                random_seed,
+                is_periodic,
+                interface_binning,
+            ):
+                # initialise `MaterialDefinition`, `InterfaceDefinition` and 
+                # `PhaseTypeDefinition` objects:
+                mats = []
+                for mat_i in materials:
+                    if "phase_types" in mat_i:
+                        mat_i["phase_types"] = [
+                            PhaseTypeDefinition(**j) for j in mat_i["phase_types"]
+                        ]
+                    mat_i = MaterialDefinition(**mat_i)
+                    mats.append(mat_i)
+
+                interfaces = [InterfaceDefinition(**int_i) for int_i in interfaces]
+
+                inp = CIPHERInput.from_random_voronoi(
+                    materials=mats,
+                    interfaces=interfaces,
+                    num_phases=num_phases,
+                    grid_size=grid_size,
+                    size=size,
+                    components=components,
+                    outputs=outputs,
+                    solution_parameters=solution_parameters,
+                    random_seed=random_seed,
+                    is_periodic=is_periodic,
+                )
+
+                if orientation_gradient:
+                    phase_centroids = inp.geometry.get_phase_voxel_centroids()
+                    ori_range, ori_idx = sample_from_orientations_gradient(
+                        phase_centroids=phase_centroids,
+                        max_misorientation_deg=orientation_gradient["max_misorientation_deg"],
+                    )
+                    oris = np.zeros((phase_centroids.shape[0], 4))
+                    oris[ori_idx] = ori_range
+                    inp.geometry.phase_orientation = oris
                     
-                    RS_params = interface_energy_misorientation_expansion['read_shockley']
-
-                    misori = inp.geometry.get_misorientation_matrix()
-                    E_GB = read_shockley(misori, **RS_params)
-
-                    num_bins = interface_energy_misorientation_expansion.get('num_bins')
-                    if num_bins:
-                        bin_edges = np.linspace(0, RS_params['E_max'], num=num_bins)
-                    else:
-                        bin_edges = None
+                    new_phase_ori = np.copy(inp.geometry.phase_orientation)
+                    
+                    if "add_highly_misoriented_grain" in orientation_gradient:
+                        add_HMG = orientation_gradient["add_highly_misoriented_grain"]
+                        if add_HMG is True:
+                            phase_idx = np.argmin(
+                                np.sum(
+                                    (
+                                        phase_centroids - (inp.geometry.size * np.array([0.3, 0.5]))
+                                    ) ** 2,
+                                    axis=1,
+                                )
+                            )
+                        else:
+                            phase_idx = add_HMG
+                            
+                        # consider a fraction to be misoriented by (1 == max_misorientation_deg)
+                        if "highly_misoriented_grain_misorientation" in orientation_gradient:
+                            HMG_misori = orientation_gradient["highly_misoriented_grain_misorientation"]
+                        else:
+                            HMG_misori = 1.0
                         
-                    for int_name in interface_energy_misorientation_expansion['interfaces']:
-                        inp.apply_interface_property(
-                            base_interface_name=int_name,
-                            property_name=('energy', 'e0'),
-                            property_values=E_GB,
-                            additional_metadata={'misorientation': misori},
-                            bin_edges=bin_edges,
-                        )
+                        new_ori = ori_range[int(HMG_misori * (ori_range.shape[0] - 1))]                        
+                        new_phase_ori[phase_idx] = new_ori
+
+                    inp.geometry.phase_orientation = new_phase_ori
+
+                if interface_binning:
+                    inp.bin_interfaces_by_misorientation_angle(**interface_binning)
 
                 phase_field_input = inp.to_JSON(keep_arrays=True)
 
@@ -272,7 +401,7 @@ def write_generate_phase_field_input_VE_input(
     outputs,
     solution_parameters,
     random_seed,
-    interface_energy_misorientation_expansion,
+    interface_binning,
     keep_3D,
 ):
     kwargs = {
@@ -285,7 +414,7 @@ def write_generate_phase_field_input_VE_input(
         'outputs': outputs,
         'solution_parameters': solution_parameters,
         'random_seed': random_seed,
-        'interface_energy_misorientation_expansion': interface_energy_misorientation_expansion,
+        'interface_binning': interface_binning,
         'keep_3D': keep_3D,
     }
     hickle.dump(kwargs, path)
@@ -324,7 +453,7 @@ def write_generate_phase_field_input_from_volume_element_py(path):
                 outputs,
                 solution_parameters,
                 random_seed,
-                interface_energy_misorientation_expansion,
+                interface_binning,
                 keep_3D,
             ):
                 mats = []
@@ -354,32 +483,12 @@ def write_generate_phase_field_input_from_volume_element_py(path):
                     outputs=outputs,
                     solution_parameters=solution_parameters,
                 )
-                if interface_energy_misorientation_expansion:
-                    # Calculate misorientations between all phases, and use Read-Shockley to assign
-                    # a GB energy for each phase pair; optionally bin phase-pairs togetherL
-                    
-                    RS_params = interface_energy_misorientation_expansion['read_shockley']
 
-                    misori = inp.geometry.get_misorientation_matrix()
-                    E_GB = read_shockley(misori, **RS_params)
-
-                    num_bins = interface_energy_misorientation_expansion.get('num_bins')
-                    if num_bins:
-                        bin_edges = np.linspace(0, RS_params['E_max'], num=num_bins)
-                    else:
-                        bin_edges = None
-                        
-                    for int_name in interface_energy_misorientation_expansion['interfaces']:
-                        inp.apply_interface_property(
-                            base_interface_name=int_name,
-                            property_name=('energy', 'e0'),
-                            property_values=E_GB,
-                            additional_metadata={'misorientation': misori},
-                            bin_edges=bin_edges,
-                        )
+                if interface_binning:
+                    inp.bin_interfaces_by_misorientation_angle(**interface_binning)
 
                 phase_field_input = inp.to_JSON(keep_arrays=True)
-                
+
                 return phase_field_input
 
             def volume_element_to_cipher_geometry(
@@ -395,6 +504,18 @@ def write_generate_phase_field_input_from_volume_element_py(path):
                 uq, inv = np.unique(volume_element['constituent_phase_label'], return_inverse=True)
                 cipher_phases = {i: np.where(inv == idx)[0] for idx, i in enumerate(uq)}
                 orientations = volume_element['orientations']['quaternions']
+
+                # we need P=-1, because that's what DAMASK Rotation object assumes, which
+                # we use when/if finding the disorientations for the
+                # misorientation_matrix:
+                if volume_element['orientations']['P'] == 1:
+                    # multiple vector part by -1 to get P=-1:
+                    if volume_element['orientations']['quat_component_ordering'] == 'scalar-vector':
+                        quat_vec_idx = [1, 2, 3]
+                    else:
+                        quat_vec_idx = [0, 1, 2]
+                    orientations[:, quat_vec_idx] *= -1
+
                 for mat_name_i in cipher_phases:
                     phases_set = False
                     if phase_type_map:
@@ -414,7 +535,7 @@ def write_generate_phase_field_input_from_volume_element_py(path):
 
                     if not phases_set:
                         raise ValueError(
-                            f"No defined material/phase-type for Dream3D phase {mat_name_i!r}"
+                            f"No defined material/phase-type for VE phase {mat_name_i!r}"
                         )
 
                 voxel_phase = volume_element['element_material_idx']
@@ -451,6 +572,11 @@ def write_generate_phase_field_input_from_volume_element_py(path):
     output_name='phase_field_input',
     task='generate_phase_field_input',
     method='from_random_voronoi_with_orientations',
+)
+@output_mapper(
+    output_name='phase_field_input',
+    task='generate_phase_field_input',
+    method='from_random_voronoi_with_orientation_gradient',
 )
 @output_mapper(
     output_name='phase_field_input',
@@ -528,6 +654,15 @@ def write_cipher_output_parse_py(path):
                         args = json.load(fp)
 
                     out = CIPHEROutput.parse(directory='.', options=args)
+                    
+                    # # GBs in initial geom:
+                    # out.cipher_input.geometry.get_grain_boundaries()
+
+                    # # GBs in subsequent geoms:
+                    # out.set_all_geometries()
+                    # for geom in out.geometries:
+                    #     geom.get_grain_boundaries()
+
                     out_js = out.to_JSON(keep_arrays=True)
                     hickle.dump(out_js, 'post_proc_outputs.hdf5')
 
