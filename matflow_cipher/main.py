@@ -625,7 +625,7 @@ def write_cipher_input_py(path):
 
                 if __name__ == "__main__":
                     inp = CIPHERInput.from_JSON(hickle.load('inputs.hdf5')['phase_field_input'])
-                    inp.write_yaml('cipher_input.yaml')
+                    inp.write_yaml('cipher_input.yaml', separate_mappings=True)
                     inp.geometry.write_VTK('initial.vti')
 
             """
