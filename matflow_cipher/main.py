@@ -615,7 +615,7 @@ def write_cipher_output_parse_args_json(path, num_VTU_files, VTU_files_time_inte
     task="simulate_grain_growth",
     method="phase_field",
 )
-def write_cipher_input_py(path):
+def write_cipher_input_py(path, separate_mapping_files):
     with Path(path).open("wt") as fp:
         fp.write(
             dedent(
@@ -625,11 +625,11 @@ def write_cipher_input_py(path):
 
                 if __name__ == "__main__":
                     inp = CIPHERInput.from_JSON(hickle.load('inputs.hdf5')['phase_field_input'])
-                    inp.write_yaml('cipher_input.yaml', separate_mappings=True)
+                    inp.write_yaml('cipher_input.yaml', separate_mappings={separate_mapping_files})
                     inp.geometry.write_VTK('initial.vti')
 
             """
-            )
+            ).format(separate_mapping_files=separate_mapping_files)
         )
 
 @input_mapper(
