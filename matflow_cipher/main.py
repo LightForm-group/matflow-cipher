@@ -25,6 +25,7 @@ def write_generate_phase_field_input_RV_input(
     solution_parameters,
     random_seed,
     is_periodic,
+    combine_phases,
 ):
     kwargs = {
         'materials': materials,
@@ -37,6 +38,7 @@ def write_generate_phase_field_input_RV_input(
         'solution_parameters': solution_parameters,
         'random_seed': random_seed,
         'is_periodic': is_periodic,
+        'combine_phases': combine_phases,
     }
     hickle.dump(kwargs, path)
 
@@ -59,6 +61,7 @@ def write_generate_phase_field_input_RV_with_orientations_input(
     random_seed,
     is_periodic,
     interface_binning,
+    combine_phases,
 ):
     kwargs = {
         'materials': materials,
@@ -73,6 +76,7 @@ def write_generate_phase_field_input_RV_with_orientations_input(
         'random_seed': random_seed,
         'is_periodic': is_periodic,
         'interface_binning': interface_binning,
+        'combine_phases': combine_phases,
     }
     hickle.dump(kwargs, path)
 
@@ -95,6 +99,7 @@ def write_generate_phase_field_input_RV_with_orientations_gradient_input(
     random_seed,
     is_periodic,
     interface_binning,
+    combine_phases,
 ):
     kwargs = {
         'materials': materials,
@@ -109,6 +114,8 @@ def write_generate_phase_field_input_RV_with_orientations_gradient_input(
         'random_seed': random_seed,
         'is_periodic': is_periodic,
         'interface_binning': interface_binning,
+        'combine_phases': combine_phases,
+
     }
     hickle.dump(kwargs, path)
 
@@ -143,6 +150,7 @@ def write_generate_phase_field_input_from_random_voronoi_py(path):
                 solution_parameters,
                 random_seed,
                 is_periodic,
+                combine_phases=None,
             ):
                 # initialise `MaterialDefinition`, `InterfaceDefinition` and 
                 # `PhaseTypeDefinition` objects:
@@ -168,6 +176,7 @@ def write_generate_phase_field_input_from_random_voronoi_py(path):
                     solution_parameters=solution_parameters,
                     random_seed=random_seed,
                     is_periodic=is_periodic,
+                    combine_phases=combine_phases,
                 )
                 phase_field_input = inp.to_JSON(keep_arrays=True)
 
@@ -218,6 +227,7 @@ def write_generate_phase_field_input_from_random_voronoi_orientations_py(path):
                 is_periodic,
                 orientations,
                 interface_binning,
+                combine_phases=None,
             ):
                 quats = orientations['quaternions']
 
@@ -252,6 +262,7 @@ def write_generate_phase_field_input_from_random_voronoi_orientations_py(path):
                     solution_parameters=solution_parameters,
                     random_seed=random_seed,
                     is_periodic=is_periodic,
+                    combine_phases=combine_phases,
                 )
 
                 if interface_binning:
@@ -306,6 +317,7 @@ def write_generate_phase_field_input_from_random_voronoi_orientations_gradient_p
                 random_seed,
                 is_periodic,
                 interface_binning,
+                combine_phases=None,
             ):
                 # initialise `MaterialDefinition`, `InterfaceDefinition` and 
                 # `PhaseTypeDefinition` objects:
@@ -331,6 +343,7 @@ def write_generate_phase_field_input_from_random_voronoi_orientations_gradient_p
                     solution_parameters=solution_parameters,
                     random_seed=random_seed,
                     is_periodic=is_periodic,
+                    combine_phases=combine_phases,
                 )
 
                 if orientation_gradient:
@@ -403,6 +416,7 @@ def write_generate_phase_field_input_VE_input(
     random_seed,
     interface_binning,
     keep_3D,
+    combine_phases,
 ):
     kwargs = {
         'volume_element': volume_element,
@@ -416,6 +430,7 @@ def write_generate_phase_field_input_VE_input(
         'random_seed': random_seed,
         'interface_binning': interface_binning,
         'keep_3D': keep_3D,
+        'combine_phases': combine_phases,
     }
     hickle.dump(kwargs, path)
 
@@ -455,6 +470,7 @@ def write_generate_phase_field_input_from_volume_element_py(path):
                 random_seed,
                 interface_binning,
                 keep_3D,
+                combine_phases=None,
             ):
                 mats = []
                 for mat_i in materials:
@@ -475,6 +491,7 @@ def write_generate_phase_field_input_from_volume_element_py(path):
                     size=size,
                     random_seed=random_seed,
                     keep_3D=keep_3D,
+                    combine_phases=combine_phases,
                 )
 
                 inp = CIPHERInput(
@@ -499,6 +516,7 @@ def write_generate_phase_field_input_from_volume_element_py(path):
                 size=None,
                 random_seed=None,
                 keep_3D=False,
+                combine_phases=None,
             ):
 
                 uq, inv = np.unique(volume_element['constituent_phase_label'], return_inverse=True)
@@ -550,6 +568,7 @@ def write_generate_phase_field_input_from_volume_element_py(path):
                     materials=cipher_materials,
                     interfaces=cipher_interfaces,
                     random_seed=random_seed,
+                    combine_phases=combine_phases,
                 )
                 return geom
             
